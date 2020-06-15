@@ -141,7 +141,7 @@ export class TilesRendererBase {
 
 			if ( tile.content.uri ) {
 
-				tile.content.uri = path.join( tileSetDir, tile.content.uri );
+				tile.content.uri = tileSetDir + "/" + tile.content.uri;
 
 			}
 
