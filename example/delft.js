@@ -54,11 +54,11 @@ let params = {
 	'errorTarget': 6,
 	'errorThreshold': 60,
 	'maxDepth': 15,
-	'loadSiblings': true,
+	'loadSiblings': false,
 	'displayActiveTiles': false,
 	'resolutionScale': 1.0,
 
-	'up': '+Y',
+	'up': '+Z',
 	'displayBoxBounds': false,
 	'colorMode': 0,
 	'showThirdPerson': false,
@@ -72,7 +72,7 @@ animate();
 
 function reinstantiateTiles() {
 
-	const url = window.location.hash.replace( /^#/, '' ) || '../data/delft/tileset.json';
+	const url = window.location.hash.replace( /^#/, '' ) || '../data/zuidholland/tileset.json';
 
 	if ( tiles ) {
 
@@ -98,11 +98,9 @@ function init() {
 
 	document.body.appendChild( renderer.domElement );
 
-	camera = new PerspectiveCamera( 60, window.innerWidth / window.innerHeight, 1, 400000 );
-	camera.position.set( 983.162,
-		503.813,
-		- 400 );
-	camera.lookAt( 983.162, 503.813, - 798.179 );
+	camera = new PerspectiveCamera( 60, window.innerWidth / window.innerHeight, 1, 40000 );
+	camera.position.set( 400, 400, 400 );
+	// camera.lookAt( - 22111.060710441925, 0, - 2634.3124026883734 );
 	cameraHelper = new CameraHelper( camera );
 	scene.add( cameraHelper );
 
@@ -160,7 +158,7 @@ function init() {
 	controls = new OrbitControls( camera, renderer.domElement );
 	controls.screenSpacePanning = false;
 	controls.minDistance = 1;
-	controls.maxDistance = 2000;
+	controls.maxDistance = 10000;
 
 	// lights
 	const dirLight = new DirectionalLight( 0xffffff );
