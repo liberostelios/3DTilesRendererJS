@@ -25,7 +25,9 @@ import {
 	Group,
 	TorusBufferGeometry,
 	OrthographicCamera,
-	sRGBEncoding
+	sRGBEncoding,
+	MeshLambertMaterial,
+	Color
 } from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { BufferGeometryUtils } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
@@ -35,6 +37,10 @@ import Stats from 'three/examples/jsm/libs/stats.module.js';
 const ALL_HITS = 1;
 const FIRST_HIT_ONLY = 2;
 
+const RENDER_LOOP = false;
+
+let LOOPS = 10;
+
 let camera, controls, scene, renderer, tiles, cameraHelper;
 let thirdPersonCamera, thirdPersonRenderer, thirdPersonControls;
 let secondRenderer, secondCameraHelper, secondControls, secondCamera;
@@ -43,6 +49,7 @@ let box;
 let raycaster, mouse, rayIntersect, lastHoveredElement;
 let offsetParent;
 let statsContainer, stats;
+let material;
 
 let params = {
 
@@ -63,12 +70,35 @@ let params = {
 	'colorMode': 0,
 	'showThirdPerson': false,
 	'showSecondView': false,
+
+	'materialColor': "#ffffff",
+	'backgroundColor': "#254a64",
+
 	'reload': reinstantiateTiles,
+	'render': animate,
 
 };
 
 init();
 animate();
+
+function addLoop() {
+
+	if ( RENDER_LOOP ) {
+
+		return;
+
+	}
+
+	LOOPS ++;
+
+	if ( LOOPS == 1 ) {
+
+		animate();
+
+	}
+
+}
 
 function reinstantiateTiles() {
 
@@ -81,7 +111,24 @@ function reinstantiateTiles() {
 	}
 
 	tiles = new TilesRenderer( url );
+	tiles.downloadQueue.priorityCallback = tile => 1 / tile.cached.distance;
 	offsetParent.add( tiles.group );
+
+	tiles.onLoadModel = ( s ) => {
+
+		s.traverse( c => {
+
+			if ( c.material ) {
+
+				c.material = material;
+
+			}
+
+		} );
+
+		addLoop();
+
+	};
 
 }
 
@@ -89,11 +136,13 @@ function init() {
 
 	scene = new Scene();
 
+	material = new MeshLambertMaterial();
+
 	// primary camera view
 	renderer = new WebGLRenderer( { antialias: true } );
 	renderer.setPixelRatio( window.devicePixelRatio );
 	renderer.setSize( window.innerWidth, window.innerHeight );
-	renderer.setClearColor( 0x151c1f );
+	renderer.setClearColor( 0xd9eefc );
 	renderer.outputEncoding = sRGBEncoding;
 
 	document.body.appendChild( renderer.domElement );
@@ -116,7 +165,7 @@ function init() {
 	secondRenderer = new WebGLRenderer( { antialias: true } );
 	secondRenderer.setPixelRatio( window.devicePixelRatio );
 	secondRenderer.setSize( window.innerWidth, window.innerHeight );
-	secondRenderer.setClearColor( 0x151c1f );
+	secondRenderer.setClearColor( 0xd9eefc );
 	secondRenderer.outputEncoding = sRGBEncoding;
 
 	document.body.appendChild( secondRenderer.domElement );
@@ -159,6 +208,7 @@ function init() {
 	controls.screenSpacePanning = false;
 	controls.minDistance = 1;
 	controls.maxDistance = 10000;
+	controls.addEventListener( "change", addLoop );
 
 	// lights
 	const dirLight = new DirectionalLight( 0xffffff );
@@ -212,14 +262,14 @@ function init() {
 	const tileOptions = gui.addFolder( 'Stelios Options' );
 	tileOptions.add( params, 'loadSiblings' );
 	tileOptions.add( params, 'displayActiveTiles' );
-	tileOptions.add( params, 'errorTarget' ).min( 0 ).max( 1000 );
+	tileOptions.add( params, 'errorTarget' ).min( 0 ).max( 1000 ).onChange( addLoop );
 	tileOptions.add( params, 'errorThreshold' ).min( 0 ).max( 1000 );
 	tileOptions.add( params, 'maxDepth' ).min( 1 ).max( 100 );
 	tileOptions.add( params, 'up', [ '+Y', '-Z', '+Z' ] );
 	tileOptions.open();
 
 	const debug = gui.addFolder( 'Debug Options' );
-	debug.add( params, 'displayBoxBounds' );
+	debug.add( params, 'displayBoxBounds' ).onChange( addLoop );
 	debug.add( params, 'colorMode', {
 
 		NONE,
@@ -231,7 +281,7 @@ function init() {
 		IS_LEAF,
 		RANDOM_COLOR,
 
-	} );
+	} ).onChange( addLoop );
 	debug.open();
 
 	const exampleOptions = gui.addFolder( 'Example Options' );
@@ -254,9 +304,14 @@ function init() {
 	} );
 	exampleOptions.add( params, 'raycast', { NONE, ALL_HITS, FIRST_HIT_ONLY } );
 	exampleOptions.add( params, 'enableCacheDisplay' );
-	exampleOptions.open();
+	exampleOptions.close();
+
+	const colorOptions = gui.addFolder( 'Colors' );
+	colorOptions.addColor( params, 'materialColor' ).onChange( addLoop );
+	colorOptions.addColor( params, 'backgroundColor' ).onChange( addLoop );
 
 	gui.add( params, 'reload' );
+	gui.add( params, 'render' );
 	gui.open();
 
 	statsContainer = document.createElement( 'div' );
@@ -415,7 +470,12 @@ function updateOrthoCamera() {
 
 function animate() {
 
-	requestAnimationFrame( animate );
+	if ( LOOPS > 0 || RENDER_LOOP ) {
+
+		LOOPS --;
+		requestAnimationFrame( animate );
+
+	}
 
 	// update options
 	tiles.errorTarget = params.errorTarget;
@@ -425,6 +485,9 @@ function animate() {
 	tiles.maxDepth = params.maxDepth;
 	tiles.displayBoxBounds = params.displayBoxBounds;
 	tiles.colorMode = parseFloat( params.colorMode );
+
+	material.color.setHex( params.materialColor.replace( "#", "0x" ) );
+	renderer.setClearColor( parseInt( params.backgroundColor.replace( "#", "0x" ) ) );
 
 	if ( params.orthographic ) {
 
