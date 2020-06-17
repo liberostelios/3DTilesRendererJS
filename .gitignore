@@ -62,3 +62,8 @@ typings/
 
 # example artifacts
 example/bundle
+
+# example data for 3d bag
+example/data/breda
+example/data/zuidholland
+example/data/venv
