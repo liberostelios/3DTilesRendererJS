@@ -279,6 +279,12 @@ export class TilesRendererBase {
 
 		}
 
+		if ( tile.__contentEmpty ) {
+
+			return;
+
+		}
+
 		const stats = this.stats;
 		const lruCache = this.lruCache;
 		const downloadQueue = this.downloadQueue;
