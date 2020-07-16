@@ -481,6 +481,8 @@ export class TilesRenderer extends TilesRendererBase {
 
 			cached.scene = scene;
 
+			scene.batchAttributes = res.batchTable.header;
+
 			// We handle raycasting in a custom way so remove it from here
 			scene.traverse( c => {
 
