@@ -30,6 +30,7 @@ import {
 	LinearFilter,
 	PlaneBufferGeometry
 } from 'three';
+import { ResourceTracker } from './ResourceTracker.js';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { BufferGeometryUtils } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import * as dat from 'three/examples/jsm/libs/dat.gui.module.js';
@@ -49,8 +50,12 @@ let offsetParent;
 let statsContainer, stats;
 let material;
 let diffuseMap;
+let wmsTilesGroup;
 
-let active_tiles = [];
+const resTracker = new ResourceTracker();
+const track = resTracker.track.bind( resTracker );
+
+let activeTiles = [];
 
 let params = {
 
@@ -71,10 +76,37 @@ let params = {
 	'showThirdPerson': false,
 	'showSecondView': false,
 
-	'materialColor': "#ffffff",
+	'materialColor': "#522626",
 	'backgroundColor': "#254a64",
 
-	'maxTiles': 200,
+	'wmsUrl': "https://geodata.nationaalgeoregister.nl/luchtfoto/rgb/wmts?",
+	'wmsLayer': "2016_ortho25",
+	'wmsStyle': "default",
+	'wmsMaxTiles': 200,
+	'wmsResolution': 0.256,
+	'reloadWms': reinitWms,
+
+	'luchtfoto2018': function () {
+
+		params.wmsUrl = "https://geodata.nationaalgeoregister.nl/luchtfoto/rgb/wmts?";
+		params.wmsLayer = "2018_ortho25";
+		params.wmsStyle = "default";
+		params.materialColor = "#522626";
+
+		reinitWms();
+
+	},
+
+	'top10nl': function () {
+
+		params.wmsUrl = "https://geodata.nationaalgeoregister.nl/top10nlv2/ows?";
+		params.wmsLayer = "top10nlv2";
+		params.wmsStyle = "";
+		params.materialColor = "#7a0000";
+
+		reinitWms();
+
+	},
 
 	'reload': reinstantiateTiles,
 	'render': animate,
@@ -175,6 +207,9 @@ function init() {
 	offsetParent = new Group();
 	scene.add( offsetParent );
 
+	wmsTilesGroup = new Group();
+	offsetParent.add( wmsTilesGroup );
+
 	// Raycasting init
 	raycaster = new Raycaster();
 	mouse = new Vector2();
@@ -212,7 +247,6 @@ function init() {
 	tileOptions.add( params, 'errorThreshold' ).min( 0 ).max( 1000 ).onChange( addLoop );
 	tileOptions.add( params, 'maxDepth' ).min( 1 ).max( 100 );
 	tileOptions.add( params, 'up', [ '+Y', '-Z', '+Z' ] );
-	tileOptions.add( params, 'maxTiles' ).min( 0 ).max( 500 ).onChange( addLoop );
 	tileOptions.open();
 
 	const debug = gui.addFolder( 'Debug Options' );
@@ -249,6 +283,18 @@ function init() {
 	exampleOptions.add( params, 'raycast', { NONE, ALL_HITS, FIRST_HIT_ONLY } );
 	exampleOptions.add( params, 'enableCacheDisplay' );
 	exampleOptions.close();
+
+	const wmsOptions = gui.addFolder( 'WMS Options' );
+	wmsOptions.add( params, 'wmsUrl' );
+	wmsOptions.add( params, 'wmsLayer' );
+	wmsOptions.add( params, 'wmsStyle' );
+	wmsOptions.add( params, 'wmsMaxTiles' ).min( 0 ).max( 500 ).onChange( addLoop );
+	wmsOptions.add( params, 'wmsResolution' ).min( 0.0256 ).max( 5.12 ).step( 0.01 ).onChange( reinitWms );
+	wmsOptions.add( params, 'reloadWms' );
+
+	const wmsList = gui.addFolder( 'Predefined WMS' );
+	wmsList.add( params, 'luchtfoto2018' );
+	wmsList.add( params, 'top10nl' );
 
 	const colorOptions = gui.addFolder( 'Colors' );
 	colorOptions.addColor( params, 'materialColor' ).onChange( addLoop );
@@ -463,7 +509,7 @@ function animate() {
 
 		camera.updateMatrixWorld();
 		tiles.update();
-		updatewms();
+		updateWms();
 
 	}
 
@@ -472,16 +518,31 @@ function animate() {
 
 }
 
-function updatewms() {
+function reinitWms() {
+
+	offsetParent.remove( wmsTilesGroup );
+
+	resTracker.dispose();
+
+	wmsTilesGroup = new Group();
+	offsetParent.add( wmsTilesGroup );
+
+	activeTiles = [];
+
+	addLoop();
+
+}
+
+function updateWms() {
 
 	if ( tiles.root ) {
 
 		for ( let i = 0; i < tiles.root.children.length; i ++ ) {
 
 			let child = tiles.root.children[ i ].children[ 0 ];
-			if ( child.__visible && ! active_tiles.some( e => e == i ) && active_tiles.length < params.maxTiles ) {
+			if ( child.__visible && ! activeTiles.some( e => e == i ) && activeTiles.length < params.wmsMaxTiles ) {
 
-				active_tiles.push( i );
+				activeTiles.push( i );
 				let x = child.cached.boxTransform.elements[ 12 ];
 				let y = child.cached.boxTransform.elements[ 13 ];
 
@@ -490,7 +551,7 @@ function updatewms() {
 
 				let width = child.cached.box.max.x - child.cached.box.min.x;
 				let height = child.cached.box.max.y - child.cached.box.min.y;
-				create_tile( "https://geodata.nationaalgeoregister.nl/luchtfoto/rgb/wmts?", "2016_ortho25", "image/png", "default", x, y, real_x, real_y, width, height, 0.256 );
+				create_tile( params.wmsUrl, params.wmsLayer, "image/png", params.wmsStyle, x, y, real_x, real_y, width, height, params.wmsResolution );
 
 			}
 
@@ -518,11 +579,11 @@ function create_tile( url, layer, format, style, x, y, real_x, real_y, mesh_widt
 	diffuseMap.minFilter = LinearFilter;
 	diffuseMap.generateMipmaps = false;
 
-	var geometry = new PlaneBufferGeometry( mesh_width, mesh_height );
-	var material = new MeshBasicMaterial( { map: diffuseMap } );
+	var geometry = track( new PlaneBufferGeometry( mesh_width, mesh_height ) );
+	var material = new MeshBasicMaterial( { map: track( diffuseMap ) } );
 
 	var mesh = new Mesh( geometry, material );
-	offsetParent.add( mesh );
+	wmsTilesGroup.add( mesh );
 
 	mesh.position.x = real_x;
 	mesh.position.y = real_y;

@@ -102,7 +102,7 @@ function addLoop() {
 
 function reinstantiateTiles() {
 
-	const url = window.location.hash.replace( /^#/, '' ) || '../data/zuidholland/tileset.json';
+	const url = window.location.hash.replace( /^#/, '' ) || '../data/breda/tileset.json';
 
 	if ( tiles ) {
 
@@ -125,6 +125,8 @@ function reinstantiateTiles() {
 			}
 
 		} );
+
+		// console.log( s );
 
 		addLoop();
 
@@ -418,6 +420,17 @@ function onMouseUp( e ) {
 	if ( results.length ) {
 
 		const object = results[ 0 ].object;
+		const idx = results[ 0 ].face.a;
+		const b_offset = object.geometry.attributes._batchid.offset;
+		const stride = object.geometry.attributes._batchid.data.stride;
+		const batch_id = object.geometry.attributes._batchid.data.array[ b_offset + stride * idx ];
+
+		console.log( `Batch ID: ${ batch_id }` );
+
+		const identificatie = object.parent.batchAttributes.identificatie[ batch_id ];
+
+		console.log( `Identificatie: ${ identificatie }` );
+
 		const info = tiles.getTileInformationFromActiveObject( object );
 
 		let str = '';
