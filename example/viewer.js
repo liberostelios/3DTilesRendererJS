@@ -69,6 +69,7 @@ let params = {
 	'loadSiblings': false,
 	'displayActiveTiles': false,
 	'resolutionScale': 1.0,
+	'flattenTiles': false,
 
 	'up': '+Z',
 	'displayBoxBounds': false,
@@ -158,11 +159,47 @@ function reinstantiateTiles() {
 
 			}
 
+			if ( c.geometry && params.flattenTiles ) {
+
+				c.geometry.computeBoundingBox();
+				c.position.y = - c.geometry.boundingBox.min.y;
+
+			}
+
 		} );
 
 		addLoop();
 
 	};
+
+}
+
+function recalculateHeight() {
+
+	tiles.group.traverse( c => {
+
+		if ( c.geometry ) {
+
+			if ( params.flattenTiles ) {
+
+				c.geometry.computeBoundingBox();
+				c.position.y = - c.geometry.boundingBox.min.y;
+
+				c.updateMatrixWorld( true );
+
+			} else {
+
+				c.position.y = 0;
+
+				c.updateMatrixWorld( true );
+
+			}
+
+		}
+
+	} );
+
+	addLoop();
 
 }
 
@@ -247,6 +284,7 @@ function init() {
 	tileOptions.add( params, 'errorThreshold' ).min( 0 ).max( 1000 ).onChange( addLoop );
 	tileOptions.add( params, 'maxDepth' ).min( 1 ).max( 100 );
 	tileOptions.add( params, 'up', [ '+Y', '-Z', '+Z' ] );
+	tileOptions.add( params, 'flattenTiles' ).onChange( recalculateHeight );
 	tileOptions.open();
 
 	const debug = gui.addFolder( 'Debug Options' );
