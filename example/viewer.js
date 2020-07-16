@@ -63,13 +63,13 @@ let params = {
 	'raycast': NONE,
 	'enableCacheDisplay': false,
 
-	'errorTarget': 20,
+	'errorTarget': 50,
 	'errorThreshold': 60,
 	'maxDepth': 15,
 	'loadSiblings': false,
 	'displayActiveTiles': false,
 	'resolutionScale': 1.0,
-	'flattenTiles': false,
+	'flattenTiles': true,
 
 	'up': '+Z',
 	'displayBoxBounds': false,
@@ -77,12 +77,12 @@ let params = {
 	'showThirdPerson': false,
 	'showSecondView': false,
 
-	'materialColor': "#522626",
+	'materialColor': "#7a0000",
 	'backgroundColor': "#254a64",
 
-	'wmsUrl': "https://geodata.nationaalgeoregister.nl/luchtfoto/rgb/wmts?",
-	'wmsLayer': "2016_ortho25",
-	'wmsStyle': "default",
+	'wmsUrl': "https://geodata.nationaalgeoregister.nl/top10nlv2/ows?",
+	'wmsLayer': "top10nlv2",
+	'wmsStyle': "",
 	'wmsMaxTiles': 200,
 	'wmsResolution': 0.256,
 	'reloadWms': reinitWms,
