@@ -25,7 +25,10 @@ import {
 	Group,
 	TorusBufferGeometry,
 	sRGBEncoding,
-	MeshLambertMaterial
+	MeshLambertMaterial,
+	TextureLoader,
+	LinearFilter,
+	PlaneBufferGeometry
 } from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { BufferGeometryUtils } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
@@ -45,6 +48,9 @@ let raycaster, mouse, rayIntersect, lastHoveredElement;
 let offsetParent;
 let statsContainer, stats;
 let material;
+let diffuseMap;
+
+let active_tiles = [];
 
 let params = {
 
@@ -52,7 +58,7 @@ let params = {
 	'raycast': NONE,
 	'enableCacheDisplay': false,
 
-	'errorTarget': 6,
+	'errorTarget': 20,
 	'errorThreshold': 60,
 	'maxDepth': 15,
 	'loadSiblings': false,
@@ -67,6 +73,8 @@ let params = {
 
 	'materialColor': "#ffffff",
 	'backgroundColor': "#254a64",
+
+	'maxTiles': 200,
 
 	'reload': reinstantiateTiles,
 	'render': animate,
@@ -96,7 +104,7 @@ function addLoop() {
 
 function reinstantiateTiles() {
 
-	const url = window.location.hash.replace( /^#/, '' ) || '../data/zuidholland/tileset.json';
+	const url = window.location.hash.replace( /^#/, '' ) || '../data/zuidholland/tileset1.json';
 
 	if ( tiles ) {
 
@@ -201,9 +209,10 @@ function init() {
 	tileOptions.add( params, 'loadSiblings' );
 	tileOptions.add( params, 'displayActiveTiles' );
 	tileOptions.add( params, 'errorTarget' ).min( 0 ).max( 1000 ).onChange( addLoop );
-	tileOptions.add( params, 'errorThreshold' ).min( 0 ).max( 1000 );
+	tileOptions.add( params, 'errorThreshold' ).min( 0 ).max( 1000 ).onChange( addLoop );
 	tileOptions.add( params, 'maxDepth' ).min( 1 ).max( 100 );
 	tileOptions.add( params, 'up', [ '+Y', '-Z', '+Z' ] );
+	tileOptions.add( params, 'maxTiles' ).min( 0 ).max( 500 ).onChange( addLoop );
 	tileOptions.open();
 
 	const debug = gui.addFolder( 'Debug Options' );
@@ -324,6 +333,20 @@ function onMouseUp( e ) {
 		const object = results[ 0 ].object;
 		const info = tiles.getTileInformationFromActiveObject( object );
 
+		const idx = results[ 0 ].face.a;
+		const b_offset = object.geometry.attributes._batchid.offset;
+		const stride = object.geometry.attributes._batchid.data.stride;
+		const batch_id = object.geometry.attributes._batchid.data.array[ b_offset + stride * idx ];
+
+		console.log( `Batch ID: ${ batch_id }` );
+
+		if ( 'identificatie' in object.parent.batchAttributes ) {
+
+			const identificatie = object.parent.batchAttributes.identificatie[ batch_id ];
+			console.log( `Identificatie: ${ identificatie }` );
+
+		}
+
 		let str = '';
 		for ( const key in info ) {
 
@@ -440,11 +463,70 @@ function animate() {
 
 		camera.updateMatrixWorld();
 		tiles.update();
+		updatewms();
 
 	}
 
 	render();
 	stats.update();
+
+}
+
+function updatewms() {
+
+	if ( tiles.root ) {
+
+		for ( let i = 0; i < tiles.root.children.length; i ++ ) {
+
+			let child = tiles.root.children[ i ].children[ 0 ];
+			if ( child.__visible && ! active_tiles.some( e => e == i ) && active_tiles.length < params.maxTiles ) {
+
+				active_tiles.push( i );
+				let x = child.cached.boxTransform.elements[ 12 ];
+				let y = child.cached.boxTransform.elements[ 13 ];
+
+				let real_x = child.boundingVolume.box[ 0 ];
+				let real_y = child.boundingVolume.box[ 1 ];
+
+				let width = child.cached.box.max.x - child.cached.box.min.x;
+				let height = child.cached.box.max.y - child.cached.box.min.y;
+				create_tile( "https://geodata.nationaalgeoregister.nl/luchtfoto/rgb/wmts?", "2016_ortho25", "image/png", "default", x, y, real_x, real_y, width, height, 0.256 );
+
+			}
+
+		}
+
+	}
+
+}
+
+function create_tile( url, layer, format, style, x, y, real_x, real_y, mesh_width, mesh_height, ppm ) {
+
+	// https://geodata.nationaalgeoregister.nl/luchtfoto/rgb/wmts?request=GetMap&service=wms&version=1.3.0&layers=2016_ortho25&width=256&height=256&crs=EPSG:28992&bbox=112409,399765,112664,399926&format=image/jpeg&styles=default
+	let request_url = url;
+	request_url += "request=GetMap&service=wms&version=1.3.0";
+	request_url += `&layers=${ layer }`;
+	request_url += `&format=${ format }`;
+	request_url += `&styles=${ style }`;
+	request_url += `&width=${ mesh_width * ppm }&height=${ mesh_height * ppm }`;
+	request_url += `&crs=EPSG:28992`;
+	request_url += `&bbox=${ x - mesh_width / 2 },${ y - mesh_height / 2 },${ x + mesh_width / 2 },${ y + mesh_height / 2 }`;
+
+	var loader = new TextureLoader();
+
+	diffuseMap = loader.load( request_url, animate );
+	diffuseMap.minFilter = LinearFilter;
+	diffuseMap.generateMipmaps = false;
+
+	var geometry = new PlaneBufferGeometry( mesh_width, mesh_height );
+	var material = new MeshBasicMaterial( { map: diffuseMap } );
+
+	var mesh = new Mesh( geometry, material );
+	offsetParent.add( mesh );
+
+	mesh.position.x = real_x;
+	mesh.position.y = real_y;
+	mesh.updateMatrix();
 
 }
 
